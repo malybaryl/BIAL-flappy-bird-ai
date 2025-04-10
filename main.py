@@ -34,6 +34,7 @@ class Bird:
         self.y = HEIGHT // 2
         self.vel = 0
         self.rect = pygame.Rect(self.x, self.y, BIRD_WIDTH, BIRD_HEIGHT)
+        self.color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))  # losowy kolor
 
     def update(self):
         self.vel += GRAVITY
@@ -44,7 +45,7 @@ class Bird:
         self.vel = JUMP_STRENGTH
 
     def draw(self):
-        pygame.draw.rect(SCREEN, (255, 255, 0), self.rect)
+        pygame.draw.rect(SCREEN, self.color, self.rect)
 
 # Klasa rury
 class Pipe:
