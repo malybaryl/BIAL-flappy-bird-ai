@@ -38,11 +38,19 @@ class Player:
         self.collision_cooldown_timer = pygame.time.get_ticks()
         self.collision_cooldown = 500
         self.hit = False
-        self.sprite = self.assets.assets['player'][0]
+        self.sprite = self.assets.assets['player']
         self.distance_to_pipe = 0
         self.distance_to_pipe_only_x = 0
         self.gap_y_center = 0
         self.rel_y_to_gap = 0
+        self.real_y = self.y + self.COLLIDER_HEIGHT // 2
+        self.index = 0
+        self.index_counter = 0
+        self.animation_speed = 0.5
+        self.max_index = len(self.assets.assets['player']) - 1
+        self.red = 0
+        self.green = 0
+        self.blue = 0
         self.recolor()
     
     
@@ -52,11 +60,18 @@ class Player:
             self.can_jump = False
     
     def print_data(self):
-        print(f'[Player data: y: {self.y}, velocity: {self.velocity}, score: {self.score}, collision: {self.collision}, distance to pipe: {self.distance_to_pipe}, distance to pipe only x: {self.distance_to_pipe_only_x}, gap y center: {self.gap_y_center}, rel y to gap: {self.rel_y_to_gap}]')
+        print(f'[Player data: y: {self.real_y}, velocity: {self.velocity}, score: {self.score}, collision: {self.collision}, distance to pipe: {self.distance_to_pipe}, distance to pipe only x: {self.distance_to_pipe_only_x}, gap y center: {self.gap_y_center}, rel y to gap: {self.rel_y_to_gap}]')
     
     def recolor(self):
-        self.sprite_to_show = self.sprite.copy()
-        self.sprite_to_show.fill((random.randint(0,255), random.randint(0,255), random.randint(0,255), 255), special_flags=pygame.BLEND_RGBA_MULT)
+        self.sprite_to_show = self.sprite[self.index].copy()
+        self.red = random.randint(0,255)
+        self.green = random.randint(0,255)
+        self.blue = random.randint(0,255)
+        self.sprite_to_show.fill((self.red, self.green, self.blue, 255), special_flags=pygame.BLEND_RGBA_MULT)
+    
+    def update_animation(self):
+        self.sprite_to_show = self.sprite[self.index].copy()
+        self.sprite_to_show.fill((self.red, self.green, self.blue, 255), special_flags=pygame.BLEND_RGBA_MULT)
         
     def reset(self):
         self.x = config.WIDTH // 6 - self.assets.assets['player'][0].get_width() // 2
@@ -77,10 +92,19 @@ class Player:
         pipe_center_y = pipes[0].y + pipes[0].COLLIDER_HEIGHT + constants.GAP // 2
         player_center_y = self.y + self.collider.height // 2
         dy = pipe_center_y - player_center_y
+        self.real_y = self.y + self.COLLIDER_HEIGHT // 2
 
         self.distance_to_pipe = math.sqrt(self.distance_to_pipe_only_x**2 + dy**2)
         self.gap_y_center = pipes[0].y + pipes[0].COLLIDER_HEIGHT + constants.GAP // 2
         
+        self.index_counter += self.animation_speed
+        if self.index_counter > self.max_index + 0.95:
+            self.index_counter = 0
+            self.index = 0
+        else:
+            self.index = math.floor(self.index_counter)
+        
+        self.update_animation()
         
         self.rel_y_to_gap = player_center_y - self.gap_y_center
 
