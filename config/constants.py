@@ -1,0 +1,5 @@
+TITLE = 'Flappy AI'
+
+WHITE = (255, 255, 255)
+
+GAP = 128

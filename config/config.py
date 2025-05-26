@@ -1,0 +1,8 @@
+'''
+Game variables
+'''
+WIDTH = 240
+SCREEN_WIDTH = 1280
+HEIGHT = 135
+SCREEN_HEIGHT = 720
+FPS = 60
