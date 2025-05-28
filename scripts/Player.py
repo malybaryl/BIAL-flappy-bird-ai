@@ -4,6 +4,7 @@ import math
 import config.config as config
 import config.constants as constants
 from scripts.Assets import Assets
+from AI.scripts.Head import Head
 
 class Player:
     def __init__(self):
@@ -21,7 +22,7 @@ class Player:
         self.CAN_JUMP_COOLDOWN = 500
         self.COLLIDER_WIDTH = self.assets.assets['player'][0].get_width()
         self.COLLIDER_HEIGHT = self.assets.assets['player'][0].get_height()
-        self.PRINT_DATA = True
+        self.PRINT_DATA = config.PRINT_DATA
         self.DRAW_COLLIDER = False
         
         '''
@@ -51,8 +52,11 @@ class Player:
         self.red = 0
         self.green = 0
         self.blue = 0
+        self.stored_data = []
         self.recolor()
     
+    def get_score(self):
+        return self.score
     
     def jump(self):
         if self.can_jump:
@@ -60,7 +64,11 @@ class Player:
             self.can_jump = False
     
     def print_data(self):
+        self.stored_data = [self.real_y, self.velocity, self.score, self.collision, self.distance_to_pipe, self.distance_to_pipe_only_x, self.gap_y_center, self.rel_y_to_gap]
         print(f'[Player data: y: {self.real_y}, velocity: {self.velocity}, score: {self.score}, collision: {self.collision}, distance to pipe: {self.distance_to_pipe}, distance to pipe only x: {self.distance_to_pipe_only_x}, gap y center: {self.gap_y_center}, rel y to gap: {self.rel_y_to_gap}]')
+    
+    def get_stored_data(self):
+        return self.stored_data
     
     def recolor(self):
         self.sprite_to_show = self.sprite[self.index].copy()
