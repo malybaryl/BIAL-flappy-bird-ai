@@ -1,5 +1,11 @@
 # FlappyAI
 
+## Screenshots [EN] / Zrzuty Ekranu [PL]
+
+![](/screenshots/Screenshot_0.png)
+![](/screenshots/Screenshot_2.png)
+![](/screenshots/Screenshot_1.png)
+
 ## English
 
 ### Project Overview
@@ -32,6 +38,7 @@ FlappyAI is a NEAT-based implementation of the classic Flappy Bird game, where n
   python main.py
   ```
 - **AI Training Mode:**  
+/config/config.py -> AI = True
   ```bash
   python main.py
   ```
@@ -94,7 +101,8 @@ FlappyAI to implementacja gry Flappy Bird oparta na algorytmie NEAT, w której s
   python main.py
   ```
 - **Tryb AI (trenowanie):** 
-
+  
+  /config/config.py -> AI = True
   ```bash
   python main.py 
   ```
