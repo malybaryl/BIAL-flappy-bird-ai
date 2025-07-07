@@ -1,10 +1,13 @@
+import csv
+import os
+
 class Head:
     """
     Singleton manager for collecting and preparing agent sensory data.
 
     Ensures only one instance of Head exists, and stores raw and formatted
     input data for AI neural networks. Handles data setting, extraction,
-    and mapping to named inputs.
+    mapping to named inputs, and logging data to a CSV file.
     """
     _instance = None
 
@@ -29,7 +32,8 @@ class Head:
 
         This function is called when an instance of Head is created. If the
         instance does not exist, it initializes the Head by creating an empty
-        list to store the data and an empty dictionary to store the inputs.
+        list to store the data, an empty dictionary to store the inputs, and
+        ensures the CSV file is ready for logging.
 
         Attributes:
             data (list): A list to store the data. It stores the data in the
@@ -37,67 +41,70 @@ class Head:
                 [y, velocity, score, collision, distance_to_pipe, distance_to_pipe_only_x, gap_y_center, rel_y_to_gap]
             inputs (dict): A dictionary to store the inputs. The keys are the
                 index of the data and the values are the inputs.
+            csv_file (str): The name of the CSV file where data will be logged.
         """
         if getattr(self, '_initialized', False):
             return
         self._initialized = True
-        
-        '''
-        Data
-        
-        #? Example data
-        #
-        # [Player data: y: 72.70000000000013, 
-        #               velocity: 2, 
-        #               score: 1, 
-        #               collision: False, 
-        #               distance to pipe: 159.85771798696487, 
-        #               distance to pipe only x: 158, 
-        #               gap y center: 97, 
-        #               rel y to gap: -24.29999999999987
-        # ]
-        #
-        #? How to get to data
-        # index -> self.data[index] -> [y, velocity, score, collision, distance_to_pipe, distance_to_pipe_only_x, gap_y_center, rel_y_to_gap]
-        '''
+
         self.data = []
         self.inputs = {}
-    
-    def set_data(self, data):
-        """
-        Sets the data of the Head singleton.
+        self.csv_file = "game_data.csv"
+        self.ensure_csv_file()
 
-        This function sets the data of the Head singleton and updates the
-        corresponding attributes.
+    def ensure_csv_file(self):
+        """
+        Ensures the CSV file exists and writes the header if it doesn't.
+
+        This method checks if the CSV file exists. If not, it creates the file
+        and writes the header row with column names.
+        """
+        if not os.path.exists(self.csv_file):
+            with open(self.csv_file, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow([
+                    "generation", "living_birds", "y", "velocity", "score",
+                    "collision", "distance_to_pipe", "distance_to_pipe_only_x",
+                    "gap_y_center", "rel_y_to_gap"
+                ])
+
+    def set_data(self, data, generation, living_birds):
+        """
+        data: [y, velocity, score, collision, distance_to_pipe, ...]
+        generation: numer generacji
+        living_birds: ile agentów żyje w tej klatce
+        """
+        self.data      = data
+        self.y         = data[0]
+        self.velocity  = data[1]
+        self.score     = data[2]
+        self.collision = data[3]
+        self.distance_to_pipe        = data[4]
+        #self.distance_to_pipe_only_x = data[5]
+        self.gap_y_center            = data[6]
+        #self.rel_y_to_gap            = data[7]
+
+        # zapisz do CSV właściwe wartości
+        self.save_inputs()
+        self.log_to_csv(generation, living_birds)
+
+    def log_to_csv(self, generation, living_birds):
+        """
+        Logs the current data to the CSV file.
+
+        This method appends the current data along with the generation number
+        and the number of living birds to the CSV file.
 
         Args:
-            data (list): The data to set. The format of the data is the
-                following:
-                [y, velocity, score, collision, distance_to_pipe, distance_to_pipe_only_x, gap_y_center, rel_y_to_gap]
-
-        Attributes:
-            data (list): The data of the Head singleton.
-            y (int): The y position of the player.
-            velocity (int): The velocity of the player.
-            score (int): The score of the player.
-            collision (bool): The collision status of the player.
-            distance_to_pipe (int): The distance to the next pipe.
-            distance_to_pipe_only_x (int): The distance to the next pipe only in the x direction.
-            gap_y_center (int): The y center of the gap of the next pipe.
-            rel_y_to_gap (int): The relative y position to the gap of the next pipe.
+            generation (int): The current generation number.
+            living_birds (int): The number of living birds.
         """
-        self.data = data
-        self.y = data[0] if self.data else 0
-        self.velocity = data[1] if self.data else 0
-        self.score = data[2] if self.data else 0
-        self.collision = data[3] if self.data else False
-        self.distance_to_pipe = data[4] if self.data else 0
-        self.distance_to_pipe_only_x = data[5] if self.data else 0
-        self.gap_y_center = data[6] if self.data else 0
-        self.rel_y_to_gap = data[7] if self.data else 0
-        
-        self.save_inputs()
-    
+        with open(self.csv_file, mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                generation, living_birds, self.y, self.score, self.distance_to_pipe,self.gap_y_center
+            ]) # , self.distance_to_pipe_only_x self.rel_y_to_gap, self.velocity, self.collision
+
     def get_data(self):
         """
         Retrieves a subset of the player's data for neural network input.
@@ -113,9 +120,8 @@ class Head:
             distance to the next pipe only in the x direction, y center of the gap 
             of the next pipe, and relative y position to the gap of the next pipe.
         """
+        return (self.y, self.distance_to_pipe, self.gap_y_center) #, self.distance_to_pipe_only_x, , self.rel_y_to_gap
 
-        return (self.y, self.distance_to_pipe, self.distance_to_pipe_only_x, self.gap_y_center, self.rel_y_to_gap)
-        
     def save_inputs(self):
         """
         Map all stored data fields to a descriptive input dictionary for
@@ -126,17 +132,13 @@ class Head:
             'distance_to_pipe', 'distance_to_pipe_only_x',
             'gap_y_center', 'rel_y_to_gap'
         """
-        '''
-        Define inputs of neural network
-        '''
         self.inputs = {
             'y': self.y,
-            'velocity': self.velocity,
+            #'velocity': self.velocity,
             'score': self.score,
             'collision': self.collision,
             'distance_to_pipe': self.distance_to_pipe,
-            'distance_to_pipe_only_x': self.distance_to_pipe_only_x,
-            'gap_y_center': self.gap_y_center,
-            'rel_y_to_gap': self.rel_y_to_gap
+            #'distance_to_pipe_only_x': self.distance_to_pipe_only_x,
+            'gap_y_center': self.gap_y_center
+            #'rel_y_to_gap': self.rel_y_to_gap
         }
-

@@ -143,181 +143,108 @@ class Main:
         pygame.quit()
 
 class MainAI(Main):
-    def __init__(self, genomes, config_file):
-        """
-        AI-powered game class using NEAT for neural network training.
-
-        Extends Main to integrate NEAT networks, handling genome and network
-        creation, per-frame AI updates, fitness evaluation, and automatic
-        simulation termination when all agents are eliminated.
-        """
-        '''
-        Pygame variables
-        '''
+    def __init__(self, genomes, config_file, generation):
         super().__init__()
-        pygame.init()
-        pygame.display.init()
-        pygame.display.set_caption(constants.TITLE)
-        
-        self.window = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-        self.screen = pygame.Surface((config.WIDTH, config.HEIGHT))
-        self.clock = pygame.time.Clock()
-        self.game_is_on = True
-        
-        '''
-        AI Variables
-        '''
+        # zapamiętujemy numer generacji
+        self.generation = generation
+
+        # AI variables
         self.nets = []
         self.gens = []
         self.neurons = []
-        
+
         for _, gen in genomes:
             net = neat.nn.FeedForwardNetwork.create(gen, config_file)
             self.nets.append(net)
             self.neurons.append(Player())
             gen.fitness = 0
             self.gens.append(gen)
-        
-        
-        '''
-        Variables
-        '''
-        self.last_score = 0
+
         self.score = 0
-        
-        '''
-        Objects
-        '''
-        self.background = Background()
+
+        # obiekty
+        self.background   = Background()
         self.pipe_manager = PipeManager()
-        self.pipes = self.pipe_manager.get_pipes()
-        self.gui = GUI()
-        self.ai_head = Head() if config.AI else None
-        
-        # final self.objects:
-        # [self.background, self.neuron_1, self.neuron_2..., self.pipe_manager, self.gui]
+        self.pipes        = self.pipe_manager.get_pipes()
+        self.gui          = GUI()
+        # HEAD zawsze instancjonujemy bez warunków — jeśli AI==False, nic i tak nie będzie wywoływane
+        self.ai_head      = Head()
+
+        # headery rysujemy razem z innymi obiektami
         self.objects = [self.background]
         self.objects.extend(self.neurons)
-        self.objects.extend([self.pipe_manager, self.gui]) 
-        
+        self.objects.extend([self.pipe_manager, self.gui])
+
         self.reset()
-        
+
     def game_loop(self):
-        '''
-        Main game loop that runs continuously while the game is active.
-        
-        This loop handles input events, updates game objects, and renders the game
-        frame by frame. It processes user inputs such as quitting the game, jumping,
-        and resetting. The loop also calls update and draw methods for each game
-        object, scales the screen, and manages the frame rate.
-        '''
         while self.game_is_on:
-            '''
-            Handle events
-            '''
+            # obsługa wyjścia
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()    
-            '''
-            Update
-            '''
-            def update():
-                """
-                Updates the state of non-player game objects.
+                    pygame.quit()
+                    return
 
-                Iterates over all objects in the game, updating them if they are not
-                instances of the Player class. Handles exceptions silently and sets
-                the collision flag to False by default.
-                """
-
-                collision = False
-                for index, object in enumerate(self.objects):
+            # Update background/pipe_manager/gui
+            for obj in self.objects:
+                if not isinstance(obj, Player):
                     try:
-                        if not isinstance(self.objects[index], Player):
-                            self.objects[index].update()
-                        else:
-                            continue
-                    except Exception as e:
+                        obj.update()
+                    except:
                         pass
-            update()
-            
-            '''
-            AI Update
-            '''
-            def ai_update():
-                '''
-                AI update loop that runs every frame. It updates the AI's perception of the game world,
-                runs the neural network, and then updates the player based on the output of the neural network.
-                It also updates the fitness of each genome and removes any genomes that have a collision.
-                '''
-                if not self.neurons:
-                    self.game_is_on = False
-                    return
 
-                self.pipe_manager.update()
-                self.pipes = self.pipe_manager.get_pipes()
+            # AI-specific: przesuń rury, pobierz aktualną listę
+            self.pipe_manager.update()
+            self.pipes = self.pipe_manager.get_pipes()
 
-                prev_score = self.score
+            # policz, ile ptaków żyje przed pętlą kill()
+            living_birds = len(self.neurons)
+            prev_score   = self.score
 
-                for i in range(len(self.neurons) - 1, -1, -1):
-                    neuron = self.neurons[i]
-                    collision, self.gui = neuron.update(self.pipes, self.gui)
-                    if collision:
-                        self.gens[i].fitness -= 1
-                        self.neurons.pop(i)
-                        self.nets.pop(i)
-                        self.gens.pop(i)
-                        continue
+            # dla każdego neuronu od tyłu (by bezpiecznie popować martwe)
+            for i in range(living_birds - 1, -1, -1):
+                neuron = self.neurons[i]
+                collision, self.gui = neuron.update(self.pipes, self.gui)
+                if collision:
+                    self.gens[i].fitness -= 1
+                    self.neurons.pop(i)
+                    self.nets.pop(i)
+                    self.gens.pop(i)
+                    continue
 
-                    data = neuron.get_stored_data()
-                    self.ai_head.set_data(data)
-                    inputs = self.ai_head.get_data()
-                    output = self.nets[i].activate(inputs)
-                    if output[0] > 0.5:
-                        neuron.jump()
+                data = neuron.get_stored_data()
+                # **TU** przekazujemy zawsze wszystkie trzy wartości
+                self.ai_head.set_data(data, self.generation, living_birds)
 
-                    self.gens[i].fitness += 0.1
+                inputs = self.ai_head.get_data()
+                output = self.nets[i].activate(inputs)
+                if output[0] > 0.5:
+                    neuron.jump()
 
-                if not self.neurons:
-                    self.game_is_on = False
-                    return
+                self.gens[i].fitness += 0.1
 
-                self.score = self.neurons[0].get_score()
-                if self.score != prev_score:
-                    for gen in self.gens:
-                        gen.fitness += 5
+            if not self.neurons:
+                break
 
-            
-            if config.AI:
-                ai_update()
-                if self.game_is_on == False:
-                    break
-            
-            '''
-            Draw
-            '''
-            def draw():
-                '''
-                Draws all game objects onto the game screen.
+            # punktacja i bonusy
+            self.score = self.neurons[0].get_score()
+            if self.score != prev_score:
+                for gen in self.gens:
+                    gen.fitness += 5
 
-                This includes the background, each neuron (AI player), the pipes, and the GUI.
-                '''
-                self.screen.fill((0, 0, 0))
-                self.background.draw(self.screen)
-                for neuron in self.neurons:
-                    neuron.draw(self.screen)
-                self.pipe_manager.draw(self.screen)
-                self.gui.draw(self.screen)
-            draw()
-            
-            
-            '''
-            Pygame screen blit
-            '''
-            scaled_surface = pygame.transform.scale(self.screen, self.window.get_size())
-            self.window.blit(scaled_surface, (0, 0))
+            # rysowanie
+            self.screen.fill((0, 0, 0))
+            self.background.draw(self.screen)
+            for neuron in self.neurons:
+                neuron.draw(self.screen)
+            self.pipe_manager.draw(self.screen)
+            self.gui.draw(self.screen)
+
+            scaled = pygame.transform.scale(self.screen, self.window.get_size())
+            self.window.blit(scaled, (0, 0))
             pygame.display.flip()
             self.clock.tick(config.FPS)
+
 
 
 
@@ -333,7 +260,7 @@ def main_ai(genomes, config_file):
     calls the game_loop method to run the game.
     """
 
-    game = MainAI(genomes, config_file)
+    game = MainAI(genomes, config_file, generation=genomes[0][1].generation)
     game.game_loop()
 
 
@@ -348,16 +275,26 @@ def run(config_path):
     standard reporters (StdOutReporter and StatisticsReporter), and runs the population
     for 50 generations, calling the main_ai function for each generation.
     """
-    config_file = neat.config.Config(neat.DefaultGenome, 
-                                neat.DefaultReproduction, 
-                                neat.DefaultSpeciesSet, 
-                                neat.DefaultStagnation, 
-                                config_path)
+    config_file = neat.config.Config(
+        neat.DefaultGenome,
+        neat.DefaultReproduction,
+        neat.DefaultSpeciesSet,
+        neat.DefaultStagnation,
+        config_path
+    )
 
     population = neat.Population(config_file)
     population.add_reporter(neat.StdOutReporter(True))
     population.add_reporter(neat.StatisticsReporter())
-    winner = population.run(main_ai, 50)
+
+    gen_counter = {'gen': 0}
+    def eval_genomes(genomes, config_file):
+        gen_counter['gen'] += 1
+        game = MainAI(genomes, config_file, generation=gen_counter['gen'])
+        game.game_loop()
+
+    winner = population.run(eval_genomes, 50)
+    return winner
 
 if __name__ == "__main__":
     if config.AI:
@@ -503,56 +440,34 @@ class Main:
         pygame.quit()
 
 class MainAI(Main):
-    def __init__(self, genomes, config_file):
-        '''
-        Pygame variables
-        '''
-        super().__init__()
-        pygame.init()
-        pygame.display.init()
-        pygame.display.set_caption(constants.TITLE)
-        
-        self.window = pygame.display.set_mode((config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
-        self.screen = pygame.Surface((config.WIDTH, config.HEIGHT))
-        self.clock = pygame.time.Clock()
-        self.game_is_on = True
-        
-        '''
-        AI Variables
-        '''
+    def __init__(self, genomes, config_file, generation):
+        super().__init__()  
+        self.generation = generation
+ 
         self.nets = []
         self.gens = []
         self.neurons = []
-        
+
         for _, gen in genomes:
             net = neat.nn.FeedForwardNetwork.create(gen, config_file)
             self.nets.append(net)
             self.neurons.append(Player())
             gen.fitness = 0
             self.gens.append(gen)
-        
-        
-        '''
-        Variables
-        '''
+
         self.last_score = 0
         self.score = 0
-        
-        '''
-        Objects
-        '''
-        self.background = Background()
+
+        self.background  = Background()
         self.pipe_manager = PipeManager()
         self.pipes = self.pipe_manager.get_pipes()
         self.gui = GUI()
-        self.ai_head = Head() if config.AI else None
-        
-        # final self.objects:
-        # [self.background, self.neuron_1, self.neuron_2..., self.pipe_manager, self.gui]
+        self.ai_head = Head()
+
         self.objects = [self.background]
         self.objects.extend(self.neurons)
-        self.objects.extend([self.pipe_manager, self.gui]) 
-        
+        self.objects.extend([self.pipe_manager, self.gui])
+
         self.reset()
         
     def game_loop(self):
@@ -565,34 +480,62 @@ class MainAI(Main):
         object, scales the screen, and manages the frame rate.
         '''
         while self.game_is_on:
-            '''
-            Handle events
-            '''
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit()    
-            '''
-            Update
-            '''
-            def update():
-                """
-                Updates the state of non-player game objects.
+                    pygame.quit()
+                    return
 
-                Iterates over all objects in the game, updating them if they are not
-                instances of the Player class. Handles exceptions silently and sets
-                the collision flag to False by default.
-                """
+            for obj in self.objects:
+                if not isinstance(obj, Player):
+                    try: obj.update()
+                    except: pass
 
-                collision = False
-                for index, object in enumerate(self.objects):
-                    try:
-                        if not isinstance(self.objects[index], Player):
-                            self.objects[index].update()
-                        else:
-                            continue
-                    except Exception as e:
-                        pass
-            update()
+            self.pipe_manager.update()
+            self.pipes = self.pipe_manager.get_pipes()
+
+            living_birds = len(self.neurons)
+            prev_score = self.score
+
+            for i in range(living_birds-1, -1, -1):
+                neuron = self.neurons[i]
+                collision, self.gui = neuron.update(self.pipes, self.gui)
+                if collision:
+                    self.gens[i].fitness -= 1
+                    self.neurons.pop(i)
+                    self.nets.pop(i)
+                    self.gens.pop(i)
+                    continue
+
+                data = neuron.get_stored_data()
+                # przekaż HEAD prawdziwą generację i living_birds
+                self.ai_head.set_data(data, self.generation, living_birds)
+
+                inputs = self.ai_head.get_data()
+                output = self.nets[i].activate(inputs)
+                if output[0] > 0.5:
+                    neuron.jump()
+
+                self.gens[i].fitness += 0.1
+
+            if not self.neurons:
+                break
+
+            self.score = self.neurons[0].get_score()
+            if self.score != prev_score:
+                for gen in self.gens:
+                    gen.fitness += 5
+
+            self.screen.fill((0,0,0))
+            self.background.draw(self.screen)
+            for neuron in self.neurons:
+                neuron.draw(self.screen)
+            self.pipe_manager.draw(self.screen)
+            self.gui.draw(self.screen)
+
+            scaled = pygame.transform.scale(self.screen, self.window.get_size())
+            self.window.blit(scaled, (0,0))
+            pygame.display.flip()
+            self.clock.tick(config.FPS)
             
             '''
             AI Update
@@ -623,7 +566,11 @@ class MainAI(Main):
                         continue
 
                     data = neuron.get_stored_data()
-                    self.ai_head.set_data(data)
+
+                    generation = self.generation  
+                    living_birds = len(self.neurons)
+                    self.ai_head.set_data(data, generation, living_birds)
+
                     inputs = self.ai_head.get_data()
                     output = self.nets[i].activate(inputs)
                     if output[0] > 0.5:
@@ -631,20 +578,20 @@ class MainAI(Main):
 
                     self.gens[i].fitness += 0.1
 
-                if not self.neurons:
-                    self.game_is_on = False
-                    return
+                    if not self.neurons:
+                        self.game_is_on = False
+                        return
 
-                self.score = self.neurons[0].get_score()
-                if self.score != prev_score:
-                    for gen in self.gens:
-                        gen.fitness += 5
+                    self.score = self.neurons[0].get_score()
+                    if self.score != prev_score:
+                        for gen in self.gens:
+                            gen.fitness += 5
 
-            
-            if config.AI:
-                ai_update()
-                if self.game_is_on == False:
-                    break
+                    
+                    if config.AI:
+                        ai_update()
+                        if self.game_is_on == False:
+                            break
             
             '''
             Draw
@@ -701,16 +648,43 @@ def run(config_path):
     standard reporters (StdOutReporter and StatisticsReporter), and runs the population
     for 50 generations, calling the main_ai function for each generation.
     """
-    config_file = neat.config.Config(neat.DefaultGenome, 
-                                neat.DefaultReproduction, 
-                                neat.DefaultSpeciesSet, 
-                                neat.DefaultStagnation, 
-                                config_path)
+    """
+    Runs the AI version of the game with the given NEAT configuration file.
 
+    Parameters:
+        config_path (str): Ścieżka do pliku konfiguracyjnego NEAT.
+
+    Tworzy populację, dodaje reporterów i uruchamia ewaluację genomów
+    z licznikiem generacji.
+    """
+    # 1) wczytaj konfigurację NEAT
+    config_file = neat.config.Config(
+        neat.DefaultGenome,
+        neat.DefaultReproduction,
+        neat.DefaultSpeciesSet,
+        neat.DefaultStagnation,
+        config_path
+    )
+
+    # 2) utwórz populację i dodaj reporterów
     population = neat.Population(config_file)
     population.add_reporter(neat.StdOutReporter(True))
     population.add_reporter(neat.StatisticsReporter())
-    winner = population.run(main_ai, 50)
+
+    # 3) licznik generacji
+    gen_counter = {'gen': 0}
+
+    # 4) funkcja ewaluująca kolejne pokolenie
+    def eval_genomes(genomes, config_file):
+        # zwiększamy numer generacji
+        gen_counter['gen'] += 1
+        # przekazujemy go do MainAI jako trzeci parametr
+        game = MainAI(genomes, config_file, gen_counter['gen'])
+        game.game_loop()
+
+    # 5) uruchom NEAT, używając eval_genomes zamiast main_ai
+    winner = population.run(eval_genomes, 50)
+    return winner
 
 if __name__ == "__main__":
     if config.AI:
