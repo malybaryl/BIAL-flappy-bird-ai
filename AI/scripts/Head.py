@@ -82,7 +82,7 @@ class Head:
         self.distance_to_pipe        = data[4]
         #self.distance_to_pipe_only_x = data[5]
         self.gap_y_center            = data[6]
-        #self.rel_y_to_gap            = data[7]
+        self.rel_y_to_gap            = data[7]
 
         # zapisz do CSV właściwe wartości
         self.save_inputs()
@@ -120,12 +120,12 @@ class Head:
             distance to the next pipe only in the x direction, y center of the gap 
             of the next pipe, and relative y position to the gap of the next pipe.
         """
-        return (self.y, self.distance_to_pipe, self.gap_y_center) #, self.distance_to_pipe_only_x, , self.rel_y_to_gap
+        return (self.y, self.distance_to_pipe, self.gap_y_center, self.rel_y_to_gap) #, self.distance_to_pipe_only_x,  
 
     def save_inputs(self):
         """
         Map all stored data fields to a descriptive input dictionary for
-        debugging or extended processing.
+        debugging or extended processing.self.rel_y_to_gap
 
         Populates `self.inputs` with keys:
             'y', 'velocity', 'score', 'collision',
@@ -139,6 +139,6 @@ class Head:
             'collision': self.collision,
             'distance_to_pipe': self.distance_to_pipe,
             #'distance_to_pipe_only_x': self.distance_to_pipe_only_x,
-            'gap_y_center': self.gap_y_center
-            #'rel_y_to_gap': self.rel_y_to_gap
+            'gap_y_center': self.gap_y_center,
+            'rel_y_to_gap': self.rel_y_to_gap
         }
